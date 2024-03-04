@@ -1,0 +1,37 @@
+default:
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - apk update
+    - apk add make
+    - echo $VAULT_KEY > $(pwd)/vault.key
+    - chmod 600 $(pwd)/.ssh/config
+    - chmod 400 $(pwd)/.ssh/ansible
+    - chmod 600 $(pwd)/ansible.cfg
+    - chmod 400 $(pwd)/vault.key
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
+stages:
+  - test
+  - deploy
+
+lint:
+  stage: test
+  script: make lint
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+
+# test:
+#   stage: test
+#   script: make test
+
+deploy:
+  stage: deploy
+  script: make deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

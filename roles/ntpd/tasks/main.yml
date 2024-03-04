@@ -1,0 +1,16 @@
+---
+# tasks file for ntpd
+
+- name: Disable timedatectl
+  ansible.builtin.command: timedatectl set-ntp no
+
+- name: Install ntp
+  ansible.builtin.apt:
+    pkg:
+      - ntp
+    state: latest
+
+- name: Restart ntpd
+  ansible.builtin.systemd:
+    state: restarted
+    name: ntpd

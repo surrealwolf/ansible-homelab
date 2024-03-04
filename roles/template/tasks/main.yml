@@ -1,0 +1,52 @@
+---
+# tasks file for template
+
+- name: Clean wtmp log
+  ansible.builtin.command: truncate -s 0 /var/log/wtmp
+
+- name: Clean last log
+  ansible.builtin.command: truncate -s 0 /var/log/lastlog
+
+- name: Delete udev rules
+  ansible.builtin.file:
+    path: /etc/udev/rules.d/70-persistent-net.rules
+    state: absent
+
+- name: Delete /tmp/* path
+  ansible.builtin.file:
+    path: /tmp/*
+    state: absent
+
+- name: Delete /var/tmp/* path
+  ansible.builtin.file:
+    path: /var/tmp/*
+    state: absent
+
+- name: Reset machine id
+  ansible.builtin.command: truncate -s 0 /etc/machine-id
+
+- name: Delete /var/lib/dbus/machine-id
+  ansible.builtin.file:
+    path: /var/lib/dbus/machine-id
+    state: absent
+
+- name: Create a symbolic link to machine-id
+  ansible.builtin.file:
+    src: /etc/machine-id
+    dest: /var/lib/dbus/machine-id
+    state: link
+
+- name: Reset hostname
+  ansible.builtin.command: truncate -s 0 /etc/{hostname,hosts,resolv.conf}
+
+- name: Set hostname to localhost
+  ansible.builtin.command: hostnamectl set-hostname localhost
+
+- name: Clean history - admin
+  ansible.builtin.command: truncate -s 0 /home/admin/.bash_history
+
+- name: Clean history - ansible
+  ansible.builtin.command: truncate -s 0 /home/ansible/.bash_history
+
+- name: Clean history - root
+  ansible.builtin.command: truncate -s 0 /root/.bash_history

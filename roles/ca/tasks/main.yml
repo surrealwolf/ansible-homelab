@@ -1,0 +1,457 @@
+---
+# tasks file for ca
+
+- name: Install EasyRSA
+  ansible.builtin.apt:
+    pkg:
+      - easy-rsa
+    state: present
+
+- name: Create a symbolic link
+  ansible.builtin.file:
+    src: /usr/share/easy-rsa
+    dest: /home/ansible/easy-rsa
+    owner: ansible
+    group: ansible
+    mode: '0700'
+    state: link
+
+- name: Init PKI
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa init-pki
+  args:
+    creates: /home/ansible/pki
+  become: false
+
+- name: Touch CA values
+  ansible.builtin.file:
+    path: /home/ansible/easy-rsa/vars
+    state: touch
+
+- name: Setup CA values
+  ansible.builtin.blockinfile:
+    path: /home/ansible/easy-rsa/vars
+    block: |
+      set_var EASYRSA_BATCH          "yes"
+      set_var EASYRSA_REQ_CN         "{{ ansible_facts['fqdn'] }}"
+      set_var EASYRSA_REQ_COUNTRY    "{{ vault_ca_country }}"
+      set_var EASYRSA_REQ_PROVINCE   "{{ vault_ca_province }}"
+      set_var EASYRSA_REQ_CITY       "{{ vault_ca_city }}"
+      set_var EASYRSA_REQ_ORG        "{{ vault_ca_org }}"
+      set_var EASYRSA_REQ_EMAIL      "{{ vault_ca_email }}"
+      set_var EASYRSA_REQ_OU         "{{ vault_ca_ou }}"
+      set_var EASYRSA_ALGO           "ec"
+      set_var EASYRSA_DIGEST         "sha512"
+  become: false
+
+- name: Build CA
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa build-ca nopass
+  args:
+    creates: /home/ansible/pki/ca.crt
+  become: false
+
+- name: Download CA
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/ca.crt
+    dest: /code/pki/certs/
+    flat: true
+
+- name: Create CSR directory if it does not exist
+  ansible.builtin.file:
+    path: /home/ansible/pki/csr
+    owner: ansible
+    group: ansible
+    state: directory
+
+- name: Create key directory if it does not exist
+  ansible.builtin.file:
+    path: /home/ansible/pki/key
+    owner: ansible
+    group: ansible
+    state: directory
+
+# GitLab certificate
+
+- name: Generate an OpenSSL private key for GitLab
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/gitlab.key
+  become: false
+
+- name: Generate an OpenSSL CSR for GitLab
+  community.crypto.openssl_csr:
+    path: /home/ansible/pki/csr/gitlab.csr
+    privatekey_path: /home/ansible/pki/key/gitlab.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: gitlab.dataknife.net
+  become: false
+
+- name: Import GitLab CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/gitlab.csr gitlab
+  args:
+    creates: /home/ansible/pki/reqs/gitlab.req
+  become: false
+
+- name: Sign GitLab CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server gitlab
+  args:
+    creates: /home/ansible/pki/issued/gitlab.crt
+  become: false
+
+- name: Get GitLab cert contents
+  ansible.builtin.command: cat /home/ansible/pki/issued/gitlab.crt
+  become: false
+  register: gitlab_crt
+
+- name: Find root certificate and append to GitLab cert
+  community.crypto.certificate_complete_chain:
+    input_chain: "{{ gitlab_crt.stdout }}"
+    root_certificates:
+    - /home/ansible/pki/ca.crt
+  become: false
+  register: gitlab_chain
+
+- name: Write fullchain GitLab cert
+  ansible.builtin.copy:
+    dest: /home/ansible/pki/issued/gitlab-fullchain.crt
+    content: "{{ ''.join(gitlab_chain.complete_chain) }}"
+  become: false
+
+- name: Download GitLab key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/gitlab.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download GitLab cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/gitlab.crt
+    dest: /code/pki/certs/
+    flat: true
+
+- name: Download GitLab fullchain cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/gitlab-fullchain.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# Rancher certificate
+
+- name: Generate an OpenSSL private key for rancher
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/rancher.key
+  become: false
+
+- name: Generate an OpenSSL CSR for rancher
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/rancher.csr
+    privatekey_path: /home/ansible/pki/key/rancher.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: rancher.dataknife.net
+    subject_alt_name: "{{ item.value | map('regex_replace', '^', 'DNS:') | list }}"
+  with_dict:
+    dns_server:
+    - rancher.dataknife.net
+  become: false
+
+- name: Import rancher CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/rancher.csr rancher
+  args:
+    creates: /home/ansible/pki/reqs/rancher.req
+  become: false
+
+- name: Sign rancher CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server rancher
+  args:
+    creates: /home/ansible/pki/issued/rancher.crt
+  become: false
+
+- name: Get rancher cert contents
+  ansible.builtin.command: cat /home/ansible/pki/issued/rancher.crt
+  become: false
+  register: rancher_crt
+
+- name: Find root certificate and append to rancher cert
+  community.crypto.certificate_complete_chain:
+    input_chain: "{{ rancher_crt.stdout }}"
+    root_certificates:
+    - /home/ansible/pki/ca.crt
+  become: false
+  register: rancher_chain
+
+- name: Write fullchain rancher cert
+  ansible.builtin.copy:
+    dest: /home/ansible/pki/issued/rancher-fullchain.crt
+    content: "{{ ''.join(rancher_chain.complete_chain) }}"
+  become: false
+
+- name: Download rancher key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/rancher.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download rancher cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/rancher.crt
+    dest: /code/pki/certs/
+    flat: true
+
+- name: Download rancher fullchain cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/rancher-fullchain.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# TrueNAS certificate
+
+- name: Generate an OpenSSL private key for TrueNAS
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/tn.key
+  become: false
+
+- name: Generate an OpenSSL CSR for TrueNAS
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/tn.csr
+    privatekey_path: /home/ansible/pki/key/tn.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: tn.dataknife.net
+  become: false
+
+- name: Import TrueNAS CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/tn.csr tn
+  args:
+    creates: /home/ansible/pki/reqs/tn.req
+  become: false
+
+- name: Sign TrueNAS CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server tn
+  args:
+    creates: /home/ansible/pki/issued/tn.crt
+  become: false
+
+- name: Download TrueNAS key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/tn.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download TrueNAS cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/tn.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# Dome certificate
+
+- name: Upload dome csr
+  ansible.builtin.copy:
+    src: /code/pki/csr/dome.csr
+    dest: /home/ansible/pki/csr/dome.csr
+
+- name: Import dome CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/dome.csr dome
+  args:
+    creates: /home/ansible/pki/reqs/dome.req
+  become: false
+
+- name: Sign dome CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server dome
+  args:
+    creates: /home/ansible/pki/issued/dome.crt
+  become: false
+
+- name: Download dome cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/dome.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# iDRAC01 certificate
+
+- name: Generate an OpenSSL private key for idrac01
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/idrac01.key
+  become: false
+
+- name: Generate an OpenSSL CSR for idrac01
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/idrac01.csr
+    privatekey_path: /home/ansible/pki/key/idrac01.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: idrac01.dataknife.net
+  become: false
+
+- name: Import idrac01 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/idrac01.csr idrac01
+  args:
+    creates: /home/ansible/pki/reqs/idrac01.req
+  become: false
+
+- name: Sign idrac01 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server idrac01
+  args:
+    creates: /home/ansible/pki/issued/idrac01.crt
+  become: false
+
+- name: Download idrac01 key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/idrac01.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download idrac01 cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/idrac01.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# iDRAC02 certificate
+
+- name: Generate an OpenSSL private key for idrac02
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/idrac02.key
+  become: false
+
+- name: Generate an OpenSSL CSR for idrac02
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/idrac02.csr
+    privatekey_path: /home/ansible/pki/key/idrac02.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: idrac02.dataknife.net
+  become: false
+
+- name: Import idrac02 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/idrac02.csr idrac02
+  args:
+    creates: /home/ansible/pki/reqs/idrac02.req
+  become: false
+
+- name: Sign idrac02 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server idrac02
+  args:
+    creates: /home/ansible/pki/issued/idrac02.crt
+  become: false
+
+- name: Download idrac02 key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/idrac02.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download idrac02 cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/idrac02.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# iDRAC05 certificate
+
+- name: Generate an OpenSSL private key for idrac05
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/idrac05.key
+  become: false
+
+- name: Generate an OpenSSL CSR for idrac05
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/idrac05.csr
+    privatekey_path: /home/ansible/pki/key/idrac05.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: idrac05.dataknife.net
+  become: false
+
+- name: Import idrac05 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/idrac05.csr idrac05
+  args:
+    creates: /home/ansible/pki/reqs/idrac05.req
+  become: false
+
+- name: Sign idrac05 CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server idrac05
+  args:
+    creates: /home/ansible/pki/issued/idrac05.crt
+  become: false
+
+- name: Download idrac05 key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/idrac05.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download idrac05 cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/idrac05.crt
+    dest: /code/pki/certs/
+    flat: true
+
+# bitwarden certificate
+
+- name: Generate an OpenSSL private key for bitwarden
+  community.crypto.openssl_privatekey:
+    path: /home/ansible/pki/key/bitwarden.key
+  become: false
+
+- name: Generate an OpenSSL CSR for bitwarden
+  community.crypto.openssl_csr:    
+    path: /home/ansible/pki/csr/bitwarden.csr
+    privatekey_path: /home/ansible/pki/key/bitwarden.key
+    country_name: "{{ vault_ca_country }}"
+    state_or_province_name: "{{ vault_ca_province }}"
+    locality_name: "{{ vault_ca_city }}"
+    organization_name: "{{ vault_ca_org }}"
+    email_address: "{{ vault_ca_email }}"
+    organizational_unit_name: "{{ vault_ca_ou }}"
+    common_name: bitwarden.dataknife.net
+  become: false
+
+- name: Import bitwarden CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa import-req /home/ansible/pki/csr/bitwarden.csr bitwarden
+  args:
+    creates: /home/ansible/pki/reqs/bitwarden.req
+  become: false
+
+- name: Sign bitwarden CSR
+  ansible.builtin.command: /home/ansible/easy-rsa/easyrsa sign-req server bitwarden
+  args:
+    creates: /home/ansible/pki/issued/bitwarden.crt
+  become: false
+
+- name: Download bitwarden key
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/key/bitwarden.key
+    dest: /code/pki/keys/
+    flat: true
+
+- name: Download bitwarden cert
+  ansible.builtin.fetch:
+    src: /home/ansible/pki/issued/bitwarden.crt
+    dest: /code/pki/certs/
+    flat: true

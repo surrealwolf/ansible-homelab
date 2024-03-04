@@ -1,0 +1,1037 @@
+---
+# tasks file for dns
+
+- name: Install bind
+  ansible.builtin.apt:
+    pkg:
+      - bind9
+      - bind9utils
+      - bind9-doc
+    state: present
+
+- name: Prevent bind9 from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: bind9
+    selection: hold
+
+- name: Prevent bind9utils from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: bind9utils
+    selection: hold
+
+- name: Prevent bind9-doc from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: bind9-doc
+    selection: hold
+
+- name: Enable ipv4 mode in bind
+  ansible.builtin.lineinfile:
+    path: /etc/default/named
+    search_string: 'OPTIONS="-u bind"'
+    line: OPTIONS="-u bind -4"
+
+- name: Touch log file
+  ansible.builtin.file:
+    path: /etc/bind/named.conf.log
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch log path
+  ansible.builtin.file:
+    path: /var/named/log
+    state: directory
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch default log file
+  ansible.builtin.file:
+    path: /var/named/log/default
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch auth_servers log file
+  ansible.builtin.file:
+    path: /var/named/log/auth_servers
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch dnssec log file
+  ansible.builtin.file:
+    path: /var/named/log/dnssec
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch zone_transfers log file
+  ansible.builtin.file:
+    path: /var/named/log/zone_transfers
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch ddns log file
+  ansible.builtin.file:
+    path: /var/named/log/ddns
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch client_security log file
+  ansible.builtin.file:
+    path: /var/named/log/client_security
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch rate_limiting log file
+  ansible.builtin.file:
+    path: /var/named/log/rate_limiting
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch rpz
+  ansible.builtin.file:
+    path: /var/named/log/rpz
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch dnstap log file
+  ansible.builtin.file:
+    path: /var/named/log/dnstap
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch queries log file
+  ansible.builtin.file:
+    path: /var/named/log/queries
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Touch query-errors log file
+  ansible.builtin.file:
+    path: /var/named/log/query-errors
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Update log bind
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.log
+    block: |
+      logging {
+        channel default_log {
+              file "/var/named/log/default" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel auth_servers_log {
+              file "/var/named/log/auth_servers" versions 100 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel dnssec_log {
+              file "/var/named/log/dnssec" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel zone_transfers_log {
+              file "/var/named/log/zone_transfers" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel ddns_log {
+              file "/var/named/log/ddns" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel client_security_log {
+              file "/var/named/log/client_security" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel rate_limiting_log {
+              file "/var/named/log/rate_limiting" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel rpz_log {
+              file "/var/named/log/rpz" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+        channel dnstap_log {
+              file "/var/named/log/dnstap" versions 3 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity info;
+        };
+      //
+      // If you have the category 'queries' defined, and you don't want query logging
+      // by default, make sure you add option 'querylog no;' - then you can toggle
+      // query logging on (and off again) using command 'rndc querylog'
+      //
+          channel queries_log {
+                file "/var/named/log/queries" versions 600 size 20m;
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                severity info;
+          };
+      //
+      // This channel is dynamic so that when the debug level is increased using
+      // rndc while the server is running, extra information will be logged about
+      // failing queries.  Other debug information for other categories will be
+      // sent to the channel default_debug (which is also dynamic), but without
+      // affecting the regular logging.
+      //
+          channel query-errors_log {
+                file "/var/named/log/query-errors" versions 5 size 20m;
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                severity dynamic;
+          };
+      //
+      // This is the default syslog channel, defined here for clarity.  You don't
+      // have to use it if you prefer to log to your own channels.
+      // It sends to syslog's daemon facility, and sends only logged messages
+      // of priority info and higher.
+      // (The options to print time, category and severity are non-default.)
+      //
+          channel default_syslog {
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                syslog daemon;
+                severity info;
+          };
+      //
+      // This is the default debug output channel, defined here for clarity.  You
+      // might want to redefine the output destination if it doesn't fit with your
+      // local system administration plans for logging.  It is also a special
+      // channel that only produces output if the debug level is non-zero.
+      //
+          channel default_debug {
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                file "named.run";
+                severity dynamic;
+          };
+      //
+      // Log routine stuff to syslog and default log:
+      //
+          category default { default_syslog; default_debug; default_log; };
+          category config { default_syslog; default_debug; default_log; };
+          category dispatch { default_syslog; default_debug; default_log; };
+          category network { default_syslog; default_debug; default_log; };
+          category general { default_syslog; default_debug; default_log; };
+      //
+      // From BIND 9.12 and newer, you can direct zone load logging to another
+      // channel with the new zoneload logging category.  If this would be useful
+      // then firstly, configure the new channel, and then edit the line below
+      // to direct the category there instead of to syslog and default log:
+      //
+          category zoneload { default_syslog; default_debug; default_log; };
+      //
+      // Log messages relating to what we got back from authoritative servers during
+      // recursion (if lame-servers and edns-disabled are obscuring other messages
+      // they can be sent to their own channel or to null).  Sometimes these log
+      // messages will be useful to research why some domains don't resolve or
+      // don't resolve reliably
+      //
+          category resolver { auth_servers_log; default_debug; };
+          category cname { auth_servers_log; default_debug; };
+          category delegation-only { auth_servers_log; default_debug; };
+          category lame-servers { auth_servers_log; default_debug; };
+          category edns-disabled { auth_servers_log; default_debug; };
+      //
+      // Log problems with DNSSEC:
+      //
+          category dnssec { dnssec_log; default_debug; };
+      //
+      // Log together all messages relating to authoritative zone propagation
+      //
+          category notify { zone_transfers_log; default_debug; };
+          category xfer-in { zone_transfers_log; default_debug; };
+          category xfer-out { zone_transfers_log; default_debug; };
+      //
+      // Log together all messages relating to dynamic updates to DNS zone data:
+      //
+          category update{ ddns_log; default_debug; };
+          category update-security { ddns_log; default_debug; };
+      //
+      // Log together all messages relating to client access and security.
+      // (There is an additional category 'unmatched' that is by default sent to
+      // null but which can be added here if you want more than the one-line
+      // summary that is logged for failures to match a view).
+      //
+          category client{ client_security_log; default_debug; };
+          category security { client_security_log; default_debug; };
+      //
+      // Log together all messages that are likely to be related to rate-limiting.
+      // This includes RRL (Response Rate Limiting) - usually deployed on authoritative
+      // servers and fetches-per-server|zone.  Note that it does not include
+      // logging of changes for clients-per-query (which are logged in category
+      // resolver).  Also note that there may on occasions be other log messages
+      // emitted by the database category that don't relate to rate-limiting
+      // behaviour by named.
+      //
+          category rate-limit { rate_limiting_log; default_debug; };
+          category spill { rate_limiting_log; default_debug; };
+          category database { rate_limiting_log; default_debug; };
+      //
+      // Log DNS-RPZ (Response Policy Zone) messages (if you are not using DNS-RPZ
+      // then you may want to comment out this category and associated channel)
+      //
+          category rpz { rpz_log; default_debug; };
+      //
+      // Log messages relating to the "dnstap" DNS traffic capture system  (if you
+      // are not using dnstap, then you may want to comment out this category and
+      // associated channel).
+      //
+          category dnstap { dnstap_log; default_debug; };
+      //
+      // If you are running a server (for example one of the Internet root
+      // nameservers) that is providing RFC 5011 trust anchor updates, then you
+      // may be interested in logging trust anchor telemetry reports that your
+      // server receives to analyze anchor propagation rates during a key rollover.
+      // If this would be useful then firstly, configure the new channel, and then
+      // un-comment and the line below to direct the category there instead of to
+      // syslog and default log:
+      //
+      //
+          category trust-anchor-telemetry { default_syslog; default_debug; default_log; };
+      //
+      // If you have the category 'queries' defined, and you don't want query logging
+      // by default, make sure you add option 'querylog no;' - then you can toggle
+      // query logging on (and off again) using command 'rndc querylog'
+      //
+          category queries { queries_log; };
+      //
+      // This logging category will only emit messages at debug levels of 1 or
+      // higher - it can be useful to troubleshoot problems where queries are
+      // resulting in a SERVFAIL response.
+      //
+          category query-errors {query-errors_log; };
+      };
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - LOGGING"
+
+- name: Delete options file
+  ansible.builtin.file:
+    path: /etc/bind/named.conf.options
+    state: absent
+
+- name: Touch options file
+  ansible.builtin.file:
+    path: /etc/bind/named.conf.options
+    state: touch
+    owner: root
+    group: bind
+    mode: '0775'
+
+- name: Update forwarders bind for ns01
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      options {
+        directory "/var/cache/bind";
+
+        recursion yes;                  # enables recursive queries
+        allow-recursion { trusted; }; # allows recursive queries from "trusted" clients
+        listen-on {
+          192.168.3.2;
+          192.168.4.2;
+          192.168.5.2;
+          192.168.7.2;
+          192.168.8.2;
+          192.168.10.2;
+          192.168.11.2;
+          192.168.12.2;
+          192.168.13.2;
+          192.168.14.2;
+        };                              # ns private IP address - listen on private network only
+        allow-transfer { none; };       # disable zone transfers by default
+
+        forwarders {
+                1.1.1.1;
+                1.0.0.1;
+                192.168.1.1;
+        };
+      };
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - OPTIONS"
+  when: "'ns01' in inventory_hostname"
+
+- name: Update forwarders bind for ns02
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      options {
+        directory "/var/cache/bind";
+
+        recursion yes;                  # enables recursive queries
+        allow-recursion { trusted; }; # allows recursive queries from "trusted" clients
+        listen-on {
+          192.168.3.3;
+          192.168.4.3;
+          192.168.5.3;
+          192.168.7.3;
+          192.168.8.3;
+          192.168.10.3;
+          192.168.11.3;
+          192.168.12.3;
+          192.168.13.3;
+          192.168.14.3;
+        };                              # ns private IP address - listen on private network only
+        allow-transfer { none; };       # disable zone transfers by default
+
+        forwarders {
+                1.1.1.1;
+                1.0.0.1;
+                192.168.1.1;
+        };
+      };
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - OPTIONS"
+  when: "'ns02' in inventory_hostname"
+
+- name: Update ACL bind
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      acl "trusted" {
+        192.168.10.2;    # ns1
+        192.168.10.3;    # ns2
+        192.168.3.0/24;  # Home subnet
+        192.168.4.0/24;  # Automation subnet
+        192.168.5.0/24;  # Subsystem subnet
+        192.168.7.0/24;  # iDRAC subnet
+        192.168.8.0/24;  # Management subnet
+        192.168.10.0/24; # VM subnet
+        192.168.11.0/24; # vMotion subnet
+        192.168.12.0/24; # Backup subnet
+        192.168.13.0/24; # Remote services subnet
+        192.168.14.0/24; # Kubernetes subnet
+      };
+    insertbefore: 'options {'
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - ACL"
+
+- name: Add zone config bind for ns01
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      zone "dataknife.net" {
+              type primary;
+              file "/etc/bind/zones/db.dataknife.net"; # zone file path
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+              update-policy { grant update-key name *.dataknife.net. A; };
+      };
+
+      zone "3.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.3";     # 192.168.3.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "4.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.4";     # 192.168.4.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "5.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.5";     # 192.168.5.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "7.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.7";     # 192.168.7.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "8.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.8";     # 192.168.8.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "10.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.10";    # 192.168.10.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "11.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.11";    # 192.168.11.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "12.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.12";    # 192.168.12.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "13.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.13";    # 192.168.13.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+
+      zone "14.168.192.in-addr.arpa" {
+              type primary;
+              file "/etc/bind/zones/db.192.168.14";    # 192.168.14.0/24 subnet
+              allow-transfer { 192.168.10.3; };        # ns02 private IP address - secondary
+      };
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone config bind for ns02
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      zone "dataknife.net" {
+              type secondary;
+              file "db.dataknife.net";      # zone file path
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "3.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.3";          # 192.168.3.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "4.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.4";          # 192.168.4.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "5.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.5";          # 192.168.5.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "7.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.7";          # 192.168.7.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "8.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.8";          # 192.168.8.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "10.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.10";         # 192.168.10.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "11.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.11";          # 192.168.11.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "12.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.12";          # 192.168.12.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "13.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.13";          # 192.168.13.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+
+      zone "14.168.192.in-addr.arpa" {
+              type secondary;
+              file "db.192.168.14";          # 192.168.14.0/24 subnet
+              primaries  { 192.168.10.2; }; # ns01 private IP address - primary
+      };
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - ZONE"
+  when: "'ns02' in inventory_hostname"
+
+- name: Add include logging bind
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.options
+    block: |
+      // include "/etc/bind/named.conf.log";
+    marker: "// {mark} ANSIBLE MANAGED BLOCK - LOGGING"
+
+- name: Create zone directory if it does not exist
+  ansible.builtin.file:
+    path: /etc/bind/zones
+    state: directory
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone file
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.dataknife.net
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.3
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.3
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.4
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.4
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.5
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.5
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.7
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.7
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.8
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.8
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.10
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.10
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.11
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.11
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.12
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.12
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.13
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.13
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone reverse file - 192.168.14
+  ansible.builtin.file:
+    path: /etc/bind/zones/db.192.168.14
+    state: touch
+    owner: root
+    group: bind
+    mode: '0774'
+  when: "'ns01' in inventory_hostname"
+
+- name: Touch zone version file
+  ansible.builtin.file:
+    path: /etc/bind/zones/version
+    state: touch
+  when: "'ns01' in inventory_hostname"
+
+- name: Download version file
+  ansible.builtin.fetch:
+    src: /etc/bind/zones/version
+    dest: /tmp/version
+    flat: true
+  when: "'ns01' in inventory_hostname"
+
+- name: Read version file contents
+  ansible.builtin.set_fact:
+    current_version: "{{ lookup('ansible.builtin.file', '/tmp/version') }}"
+  when: "'ns01' in inventory_hostname"
+
+- name: Increment version
+  ansible.builtin.set_fact:
+    version: "{{ current_version | int + 1 }}"
+  when: "'ns01' in inventory_hostname"
+
+- name: Save new version
+  ansible.builtin.lineinfile:
+    path: /etc/bind/zones/version
+    search_string: "{{ current_version }}"
+    line: "{{ version }}"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone file bind
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.dataknife.net
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; name servers - A records
+      ns01.dataknife.net.            IN      A       192.168.10.2
+      ns02.dataknife.net.            IN      A       192.168.10.3
+
+      ; CNAME records
+      rancher.dataknife.net.         IN      CNAME   hv.dataknife.net.
+
+      ; 192.168.7.0/24 - A records
+      idrac01.dataknife.net.         IN      A       192.168.7.5
+      idrac02.dataknife.net.         IN      A       192.168.7.6
+      idrac03.dataknife.net.         IN      A       192.168.7.7
+      idrac04.dataknife.net.         IN      A       192.168.7.8
+      idrac05.dataknife.net.         IN      A       192.168.7.9
+      idrac06.dataknife.net.         IN      A       192.168.7.10
+
+      ; 192.168.8.0/24 - A records
+      hvrn01.dataknife.net.         IN      A       192.168.8.5
+      hvrn02.dataknife.net.         IN      A       192.168.8.6
+      hvrn03.dataknife.net.         IN      A       192.168.8.7
+      hvrn04.dataknife.net.         IN      A       192.168.8.8
+      tn.dataknife.net.             IN      A       192.168.8.10
+      hv.dataknife.net.             IN      A       192.168.8.12
+
+      ; 192.168.10.0/24 - A records
+      ca01.dataknife.net.           IN      A       192.168.10.4
+      xo.dataknife.net.             IN      A       192.168.10.5
+      vc.dataknife.net.             IN      A       192.168.10.6
+      gitlab.dataknife.net.         IN      A       192.168.10.7
+      dome.dataknife.net.           IN      A       192.168.10.8
+      ntp.dataknife.net.            IN      A       192.168.10.9
+      checkmk.dataknife.net.        IN      A       192.168.10.10
+      graylog.dataknife.net.        IN      A       192.168.10.11
+      bitwarden.dataknife.net.      IN      A       192.168.10.12
+      mssql01.dataknife.net.        IN      A       192.168.10.15
+      pgsql01.dataknife.net.        IN      A       192.168.10.16
+      artifactory.dataknife.net.    IN      A       192.168.10.20
+      
+      ; 192.168.13.0/24 - A records
+      twc1.dataknife.net.           IN      A       192.168.13.5
+      twc2.dataknife.net.           IN      A       192.168.13.6
+      qbhost.dataknife.net.         IN      A       192.168.13.10
+      qbp1.dataknife.net.           IN      A       192.168.13.20
+      qbp2.dataknife.net.           IN      A       192.168.13.21
+      qbp3.dataknife.net.           IN      A       192.168.13.22
+      qbp4.dataknife.net.           IN      A       192.168.13.23
+
+      ; 192.168.14.0/24 - A records
+
+
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - NS"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.3
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.3
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.4
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.4
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.5
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.5
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.7
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.7
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+      5.7.168    IN      PTR     idrac01.dataknife.net.  ; 192.168.7.5
+      6.7.168    IN      PTR     idrac02.dataknife.net.  ; 192.168.7.6
+      7.7.168    IN      PTR     idrac03.dataknife.net.  ; 192.168.7.7
+      8.7.168    IN      PTR     idrac04.dataknife.net.  ; 192.168.7.8
+      9.7.168    IN      PTR     idrac05.dataknife.net.  ; 192.168.7.9
+      10.7.168   IN      PTR     idrac06.dataknife.net.  ; 192.168.7.10
+
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.8
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.8
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+      5.8.168    IN      PTR     hvrn01.dataknife.net.  ; 192.168.8.5
+      6.8.168    IN      PTR     hvrn02.dataknife.net.  ; 192.168.8.6
+      7.8.168    IN      PTR     hvrn03.dataknife.net.  ; 192.168.8.7
+      8.8.168    IN      PTR     hvrn04.dataknife.net.  ; 192.168.8.8
+      10.8.168   IN      PTR     tn.dataknife.net.      ; 192.168.8.10
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.10
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.10
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+      2.10.168    IN      PTR     ns01.dataknife.net.       ; 192.168.10.2
+      3.10.168    IN      PTR     ns02.dataknife.net.       ; 192.168.10.3
+      4.10.168    IN      PTR     ca01.dataknife.net.       ; 192.168.10.4
+      5.10.168    IN      PTR     xo.dataknife.net.         ; 192.168.10.5
+      6.10.168    IN      PTR     vc.dataknife.net.         ; 192.168.10.6
+      7.10.168    IN      PTR     gitlab.dataknife.net.     ; 192.168.10.7
+      8.10.168    IN      PTR     dome.dataknife.net.       ; 192.168.10.8
+      9.10.168    IN      PTR     ntp.dataknife.net.        ; 192.168.10.9
+      10.10.168   IN      PTR     checkmk.dataknife.net.    ; 192.168.10.10
+      11.10.168   IN      PTR     graylog.dataknife.net.    ; 192.168.10.11
+      12.10.168   IN      PTR     bitwarden.dataknife.net.  ; 192.168.10.12
+      15.10.168   IN      PTR     mssql01.dataknife.net.    ; 192.168.10.15
+      16.10.168   IN      PTR     pgsql01.dataknife.net.    ; 192.168.10.16
+      20.10.168   IN      PTR     artifactory.dataknife.net.; 192.168.10.20
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.11
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.11
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.12
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.12
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.13
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.13
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+      5.13.168    IN      PTR     twc1.dataknife.net.       ; 192.168.13.5
+      6.13.168    IN      PTR     twc2.dataknife.net.       ; 192.168.13.6
+      10.13.168   IN      PTR     qbhost.dataknife.net.     ; 192.168.13.10
+      20.13.168   IN      PTR     qbp1.dataknife.net.       ; 192.168.13.20
+      21.13.168   IN      PTR     qbp2.dataknife.net.       ; 192.168.13.21
+      22.13.168   IN      PTR     qbp3.dataknife.net.       ; 192.168.13.22
+      23.13.168   IN      PTR     qbp4.dataknife.net.       ; 192.168.13.23
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Add zone reverse file bind - 192.168.14
+  ansible.builtin.blockinfile:
+    path: /etc/bind/zones/db.192.168.14
+    block: |
+      $TTL    604800
+      @           IN      SOA     dataknife.net. admin.dataknife.net. (
+                                  {{ version }}   ; Serial
+                                  604800          ; Refresh
+                                  86400           ; Retry
+                                  2419200         ; Expire
+                                  604800 )        ; Negative Cache TTL
+      ; name servers
+                  IN      NS      ns01.dataknife.net.
+                  IN      NS      ns02.dataknife.net.
+
+      ; PTR Records
+
+    marker: "; {mark} ANSIBLE MANAGED BLOCK - REVERSE ZONE"
+  when: "'ns01' in inventory_hostname"
+
+- name: Restart bind
+  ansible.builtin.systemd:
+    state: restarted
+    name: bind9

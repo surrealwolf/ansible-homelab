@@ -1,0 +1,23 @@
+---
+# tasks file for mssql
+
+- name: Add MS SQL GPG apt Key
+  ansible.builtin.apt_key:
+    url: https://packages.microsoft.com/keys/microsoft.asc
+    state: present
+
+- name: Add MS SQL Repository
+  ansible.builtin.apt_repository:
+    repo: deb [arch=amd64,armhf,arm64] https://packages.microsoft.com/ubuntu/22.04/mssql-server-2022 jammy main
+    state: present
+
+- name: Update apt and install MS SQL
+  ansible.builtin.apt:
+    name: mssql-server
+    state: present
+    update_cache: true
+
+- name: Prevent MS SQL from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: mssql-server
+    selection: hold

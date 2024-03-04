@@ -1,0 +1,12 @@
+# Ansible files
+vault.key
+
+# VS Code files
+.vscode
+
+# Playbook files
+pki
+k8s
+
+# Sensitive files
+.ssh

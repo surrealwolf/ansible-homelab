@@ -1,0 +1,28 @@
+---
+# tasks file for gitlab_runner
+
+- name: Download gitlab repo script
+  ansible.builtin.get_url:
+    url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
+    dest: /tmp/gitlab.deb.sh
+    mode: 755
+
+- name: Install gitlab repo
+  ansible.builtin.command: /tmp/gitlab.deb.sh
+  args:
+    creates: /etc/apt/sources.list.d/gitlab_gitlab-runner.list
+
+- name: Allow gitlab-runner to be upgraded
+  ansible.builtin.dpkg_selections:
+    name: gitlab-runner
+    selection: install
+
+- name: Install gitlab runner
+  ansible.builtin.apt:
+    name: gitlab-runner
+    state: latest
+
+- name: Prevent gitlab-runner from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: gitlab-runner
+    selection: hold

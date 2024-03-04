@@ -1,0 +1,62 @@
+all:
+  children:
+    linux:
+      children:
+        jfrog:
+          hosts:
+            artifactory:
+              ansible_host: artifactory.dataknife.net
+        bitwarden-server:
+          hosts:
+            bitwarden:
+              ansible_host: bitwarden.dataknife.net
+        ca:
+          hosts:
+            ca01:
+              ansible_host: ca01.dataknife.net
+        checkmk-server:
+          hosts:
+            checkmk:
+              ansible_host: checkmk.dataknife.net
+        dns:
+          hosts:
+            ns01:
+              ansible_host: 192.168.10.2
+            ns02:
+              ansible_host: 192.168.10.3
+        gitlab:
+          hosts:
+            gitlab:
+              ansible_host: gitlab.dataknife.net
+        ntp:
+          hosts:
+            ntpd:
+              ansible_host: ntp.dataknife.net
+        mssql:
+          hosts:
+            mssql01:
+              ansible_host: mssql01.dataknife.net
+        postgresql:
+          hosts:
+            pgsql01:
+              ansible_host: pgsql01.dataknife.net
+        twingate:
+          hosts:
+            twc1:
+              ansible_host: twc1.dataknife.net
+            twc2:
+              ansible_host: twc2.dataknife.net
+    windows:
+      children:
+        quickbooks:
+          hosts:
+            qbhost:
+              ansible_host: qbhost.dataknife.net
+            qpb1:
+              ansible_host: qbp1.dataknife.net
+            qpb2:
+              ansible_host: qbp2.dataknife.net
+            qpb3:
+              ansible_host: qbp3.dataknife.net
+            qpb4:
+              ansible_host: qbp4.dataknife.net

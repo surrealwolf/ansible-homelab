@@ -1,0 +1,13 @@
+---
+# tasks file for twingate
+
+- name: Install twingate agent
+  ansible.builtin.apt:
+    pkg:
+      - twingate-connector
+    state: latest
+
+- name: Restart twingate agent
+  ansible.builtin.systemd:
+    state: restarted
+    name: twingate-connector

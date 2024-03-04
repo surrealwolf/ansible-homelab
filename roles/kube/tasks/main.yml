@@ -1,0 +1,30 @@
+---
+# tasks file for kube
+
+- name: Add Kubernetes Repository
+  ansible.builtin.apt_repository:
+    repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: Install Kube tools
+  ansible.builtin.apt:
+    pkg:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+
+- name: Prevent kubelet from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: kubelet
+    selection: hold
+
+- name: Prevent kubeadm from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: kubelet
+    selection: hold
+
+- name: Prevent kubectl from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: kubelet
+    selection: hold

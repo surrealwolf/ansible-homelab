@@ -1,0 +1,14 @@
+---
+# tasks file for postgresql
+
+- name: Install postgresql
+  ansible.builtin.apt:
+    pkg:
+      - postgresql
+      - postgresql-contrib
+    state: present
+
+- name: Prevent postgresql from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: postgresql
+    selection: hold

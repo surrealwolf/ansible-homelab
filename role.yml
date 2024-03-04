@@ -1,0 +1,2 @@
+- name: newrelic.newrelic_install
+- name: geerlingguy.mysql

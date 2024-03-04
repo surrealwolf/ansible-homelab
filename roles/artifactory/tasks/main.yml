@@ -1,0 +1,28 @@
+---
+# tasks file for artifactory
+
+- name: Add Artifactory GPG apt Key
+  ansible.builtin.apt_key:
+    url: https://releases.jfrog.io/artifactory/api/gpg/key/public
+    state: present
+
+- name: Add Artifactory Repository
+  ansible.builtin.apt_repository:
+    repo: deb https://releases.jfrog.io/artifactory/artifactory-debs jammy main
+    state: present
+
+- name: Update apt and install artifactory
+  ansible.builtin.apt:
+    name: jfrog-artifactory-oss
+    state: present
+    update_cache: true
+
+- name: Prevent Artifactory from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: jfrog-artifactory-oss
+    selection: hold
+
+- name: Start Artifactory
+  ansible.builtin.systemd:
+    state: started
+    name: artifactory

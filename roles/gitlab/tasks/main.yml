@@ -1,0 +1,66 @@
+---
+# tasks file for gitlab
+
+- name: Install gitlab dependencies
+  ansible.builtin.apt:
+    pkg:
+      - ca-certificates
+      - curl
+      - openssh-server
+      - perl
+      - postfix
+      - tzdata
+    state: present
+
+- name: Download gitlab repo script
+  ansible.builtin.get_url:
+    url: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
+    dest: /tmp/gitlab.deb.sh
+    mode: 755
+
+- name: Install gitlab repo
+  ansible.builtin.command: /tmp/gitlab.deb.sh
+  args:
+    creates: /etc/apt/sources.list.d/gitlab_gitlab-ee.list
+
+- name: Allow gitlab-ee to be upgraded
+  ansible.builtin.dpkg_selections:
+    name: gitlab-ee
+    selection: install
+
+- name: Install gitlab service
+  ansible.builtin.apt:
+    name: gitlab-ee
+    state: latest
+
+- name: Prevent gitlab-ee from being upgraded
+  ansible.builtin.dpkg_selections:
+    name: gitlab-ee
+    selection: hold
+
+- name: Create GitLab PKI path
+  ansible.builtin.file:
+    path: /etc/gitlab/ssl
+    state: directory
+    mode: '0775'
+
+- name: Upload GitLab key
+  ansible.builtin.copy:
+    src: /code/pki/keys/gitlab.key
+    dest: /etc/gitlab/ssl/gitlab.key
+    mode: '0775'
+
+- name: Upload GitLab certificate
+  ansible.builtin.copy:
+    src: /code/pki/certs/gitlab-fullchain.crt
+    dest: /etc/gitlab/ssl/gitlab.crt
+    mode: '0775'
+
+- name: Enable container registry
+  ansible.builtin.lineinfile:
+    path: /etc/gitlab/gitlab.rb
+    search_string: "# registry_external_url 'https://registry.example.com'"
+    line: "registry_external_url 'https://gitlab.dataknife.net:5050'"
+
+- name: Reconfigure GitLab
+  ansible.builtin.command: gitlab-ctl reconfigure

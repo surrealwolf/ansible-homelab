@@ -1,0 +1,52 @@
+---
+# tasks file for bitwarden
+
+- name: Add bitwarden user
+  ansible.builtin.user:
+    name: bitwarden
+    shell: /bin/bash
+
+- name: Add bitwarden user to docker group
+  ansible.builtin.user:
+    name: bitwarden
+    groups: docker
+    append: true
+
+- name: Touch bitwarden path
+  ansible.builtin.file:
+    path: /opt/bitwarden
+    state: directory
+    owner: bitwarden
+    group: bitwarden
+    mode: '0700'
+
+- name: Download bitwarden script
+  ansible.builtin.get_url:
+    url: https://func.bitwarden.com/api/dl/?app=self-host&platform=linux
+    dest: /opt/bitwarden.sh
+    owner: bitwarden
+    group: bitwarden
+    mode: '0700'
+
+- name: Touch bwdata ssl path
+  ansible.builtin.file:
+    path: /opt/bwdata/ssl/bitwarden.dataknife.net
+    state: directory
+    owner: bitwarden
+    group: bitwarden
+    mode: '0700'
+
+- name: Upload bitwarden key
+  ansible.builtin.copy:
+    src: /code/pki/keys/bitwarden.key
+    dest: /opt/bwdata/ssl/bitwarden.dataknife.net/private.key
+
+- name: Upload bitwarden certificate
+  ansible.builtin.copy:
+    src: /code/pki/certs/bitwarden.crt
+    dest: /opt/bwdata/ssl/bitwarden.dataknife.net/certificate.crt
+
+- name: Upload ca certificate
+  ansible.builtin.copy:
+    src: /code/pki/certs/ca.crt
+    dest: /opt/bwdata/ssl/bitwarden.dataknife.net/ca.crt

@@ -1,0 +1,214 @@
+---
+# tasks file for common
+
+- name: Add admin user
+  ansible.builtin.user:
+    name: admin
+    shell: /bin/bash
+    password: "{{ vault_admin_password | password_hash('sha512') }}"
+    update_password: always
+    groups: sudo
+    append: true
+
+- name: Allow user to run any commands as root
+  community.general.sudoers:
+    name: admin
+    state: present
+    user: admin
+    runas: root
+    nopassword: true
+    commands: ALL
+
+- name: Add ansible user
+  ansible.builtin.user:
+    name: ansible
+    shell: /bin/bash
+    password: "{{ vault_ansible_password | password_hash('sha512') }}"
+    update_password: always
+    groups: sudo
+    append: true
+
+- name: Allow user to run any commands as root
+  community.general.sudoers:
+    name: ansible
+    state: present
+    user: ansible
+    runas: root
+    nopassword: true
+    commands: ALL
+
+- name: Set timezone to America/Los_Angeles
+  community.general.timezone:
+    name: America/Los_Angeles
+
+- name: Install Unattended Upgrades
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+
+- name: Enable mail notification option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Mail "";'
+    line: Unattended-Upgrade::Mail "lee@fullmetal.dev";
+
+- name: Enable auto reboot option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::MailReport "on-change";'
+    line: Unattended-Upgrade::MailReport "on-change";
+
+- name: Enable updates repo option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    insertafter: 'Unattended-Upgrade::Allowed-Origins {'
+    line: '        "${distro_id}:${distro_codename}-updates";'
+
+- name: Enable auto reboot option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Automatic-Reboot "false";'
+    line: Unattended-Upgrade::Automatic-Reboot "true";
+
+- name: Enable auto reboot users option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Automatic-Reboot-WithUsers "true";'
+    line: Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+
+- name: Enable auto reboot schedule option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Automatic-Reboot-Time "02:00";'
+    line: //Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+
+- name: Enable auto remove kernels option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";'
+    line: Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+
+- name: Enable auto remove dependencies option for Unattended Upgrades
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    search_string: '//Unattended-Upgrade::Remove-Unused-Dependencies "false";'
+    line: Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+- name: Restart unattended-upgrades
+  ansible.builtin.systemd:
+    state: restarted
+    name: unattended-upgrades
+
+- name: Install Python3 with pip
+  ansible.builtin.apt:
+    pkg:
+      - python3
+      - python3-pip
+    state: present
+
+- name: Install tools
+  ansible.builtin.apt:
+    pkg:
+      - dos2unix
+      - openvswitch-switch
+      - pwgen
+      - nfs-common
+    state: present
+
+- name: Purge EOL tools
+  ansible.builtin.apt:
+    pkg:
+      - newrelic-infra
+    purge: true
+    state: absent
+
+- name: Upload CA
+  ansible.builtin.copy:
+    src: /code/pki/certs/ca.crt
+    dest: /usr/local/share/ca-certificates/ca.crt
+  when: "'ca01' not in inventory_hostname"
+
+- name: Install CA
+  ansible.builtin.command: update-ca-certificates
+  when: "'ca01' not in inventory_hostname"
+
+- name: Create scripts directory if it does not exist
+  ansible.builtin.file:
+    path: /opt/scripts
+    state: directory
+    mode: '0755'
+
+- name: Create scripts bak directory if it does not exist
+  ansible.builtin.file:
+    path: /opt/scripts/.bak/dhcp
+    state: directory
+    mode: '0755'
+
+- name: Create scripts template directory if it does not exist
+  ansible.builtin.file:
+    path: /opt/scripts/.template
+    state: directory
+    mode: '0755'
+
+- name: Upload Scripts - hostname.sh
+  ansible.builtin.copy:
+    src: /code/scripts/hostname.sh
+    dest: /opt/scripts/hostname.sh
+    mode: '0755'
+
+- name: Fix line endings - hostname.sh
+  ansible.builtin.command: dos2unix /opt/scripts/hostname.sh
+
+- name: Upload Scripts - ip-address.sh
+  ansible.builtin.copy:
+    src: /code/scripts/ip-address.sh
+    dest: /opt/scripts/ip-address.sh
+    mode: '0755'
+
+- name: Fix line endings - ip-address.sh
+  ansible.builtin.command: dos2unix /opt/scripts/ip-address.sh
+
+- name: Upload Scripts - resize.sh
+  ansible.builtin.copy:
+    src: /code/scripts/resize.sh
+    dest: /opt/scripts/resize.sh
+    mode: '0755'
+
+- name: Fix line endings - resize.sh
+  ansible.builtin.command: dos2unix /opt/scripts/resize.sh
+
+- name: Upload Netplan config - dhcp
+  ansible.builtin.copy:
+    src: /code/scripts/.template/dhcp/01-netcfg.yaml
+    dest: /opt/scripts/.bak/dhcp/01-netcfg.yaml
+    mode: '0600'
+
+- name: Upload Netplan config - default
+  ansible.builtin.copy:
+    src: /code/scripts/.template/default/01-netcfg.yaml
+    dest: /opt/scripts/.template/01-netcfg.yaml
+    mode: '0600'
+
+- name: Upload Netplan config - lb
+  ansible.builtin.copy:
+    src: /code/scripts/.template/rke2/01-netcfg.yaml
+    dest: /opt/scripts/.template/01-netcfg.yaml
+    mode: '0600'
+  when: "'lb' in inventory_hostname"
+
+- name: Upload Netplan config - rke2
+  ansible.builtin.copy:
+    src: /code/scripts/.template/rke2/01-netcfg.yaml
+    dest: /opt/scripts/.template/01-netcfg.yaml
+    mode: '0600'
+  when: "'rke0' in inventory_hostname"
+
+- name: Upload Netplan config - vpn
+  ansible.builtin.copy:
+    src: /code/scripts/.template/vpn/01-netcfg.yaml
+    dest: /opt/scripts/.template/01-netcfg.yaml
+    mode: '0600'
+  when: "'twc' in inventory_hostname"
+
+- name: Fix line endings Netplan config
+  ansible.builtin.command: dos2unix /opt/scripts/.template/01-netcfg.yaml
