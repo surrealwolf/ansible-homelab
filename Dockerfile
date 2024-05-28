@@ -12,3 +12,6 @@ COPY collection.yml /tmp/collection.yml
 COPY role.yml /tmp/role.yml
 RUN ansible-galaxy collection install -r /tmp/collection.yml
 RUN ansible-galaxy install -r /tmp/role.yml
+RUN mkdir -p /etc/ansible/.ssh
+COPY .ssh/ansible /etc/ansible/.ssh/ansible
+RUN chmod 400 /etc/ansible/.ssh/ansible
